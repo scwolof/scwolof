@@ -29,13 +29,20 @@ def gradient (f, X, eps=1e-6, flatten=False):
         - Flattened:
         Numpy array np.c_[d.flatten(), dy.flatten(), dh.flatten()]
     """
+    n, D = X.shape
 
     # Analytical gradient
-    _, dy = f(X)
+    y, dy = f(X)
+    assert y.shape[0] == n
+    if y.ndim == 1:
+        assert dy.shape == (n,D)
+    else:
+        E = y.shape[1]
+        assert dy.shape == (n,E,D)
 
     # Numerical gradients using finite differences
     dh = np.zeros( dy.shape )
-    for k in range( X.shape[1] ):
+    for k in range( D ):
         # Step array
         t      = np.zeros( X.shape )
         t[:,k] = eps
@@ -77,13 +84,20 @@ def hessian (f, X, eps = 0.0001, flatten=False):
         - Flattened:
         Numpy array np.c_[d.flatten(), dy.flatten(), dh.flatten()]
     """
+    n, D = X.shape
 
     # Analytical Hessians
     y, ddy = f(X)
+    assert y.shape[0] == n
+    if y.ndim == 1:
+        assert ddy.shape == (n,D,D)
+    else:
+        E = y.shape[1]
+        assert ddy.shape == (n,E,D,D)
 
     # Numerical Hessians using finite differences
     ddh = np.zeros( ddy.shape )
-    for i in range( X.shape[1] ):
+    for i in range( D ):
         # Add steps to test points
         Ti      = np.zeros( X.shape )
         Ti[:,i] = eps
@@ -91,7 +105,7 @@ def hessian (f, X, eps = 0.0001, flatten=False):
         ym = f(X - Ti)[0]
         ddh[...,i,i] = (yp - 2*y + ym) / eps**2
 
-        for j in range(i+1, X.shape[1]):
+        for j in range(i+1, D):
             # Add steps to test points
             Tj      = np.zeros( X.shape )
             Tj[:,j] = eps
