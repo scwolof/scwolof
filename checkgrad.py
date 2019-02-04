@@ -46,7 +46,7 @@ def gradient (f, X, eps=1e-6):
     for ind in inds:
         # Step array
         t      = np.zeros( X.shape )
-        t[ind] = eps
+        exec("t["+','.join([str(i) for i in ind])+"] = eps")
         # Evaluate function
         yp = f(X + t)[0]
         ym = f(X - t)[0]
