@@ -63,63 +63,74 @@ def gradient (f, X, eps=1e-6):
 
 
 
-def hessian (f, X, eps = 0.0001, flatten=False):
+def hessian (f, X, eps=1e-6):
     """
     Check Hessian of function.
     checkgrad.hessian (f, X, eps=1e-6)
 
     Inputs:
-        f           Function, returns Y(X), d^2Y/dX^2.
-                    X       [n, D] 
-                    Y       [n, (E)]
-                    dY/dX   [n, (E,) D, D]
-        X           [n, D] input
+        f           Function, returns Y(X), d^2Y / dX^2.
+                    X           [D1, ..., Dn] 
+                    Y           [E1, ..., Em]
+                    d^2Y/dX^2   [E1, ..., Em, D1, ..., Dn, D1, ..., Dn]
         eps         Step size
-        flatten     Return a more print-friendly result.
 
     Outputs:
         - Default:
         d           Relative difference |ddy-ddh| / |ddy+ddh|
         ddy         Analytical Hessian
         ddh         Numerical Hessian
-        - Flattened:
-        Numpy array np.c_[d.flatten(), dy.flatten(), dh.flatten()]
+        flattened   d, ddy and ddh flattened into three columns
     """
-    n, D = X.shape
+    shape_in = X.shape
+    if not isinstance(shape_in, list):
+        shape_in = list(shape_in)
 
-    # Analytical Hessians
+    # Analytical Hessian
     y, ddy = f(X)
-    assert y.shape[0] == n
-    if y.ndim == 1:
-        assert ddy.shape == (n,D,D)
-    else:
-        E = y.shape[1]
-        assert ddy.shape == (n,E,D,D)
-
-    # Numerical Hessians using finite differences
+    shape_out = y.shape
+    if not isinstance(shape_out, list):
+        shape_out = list(shape_out)
+    assert list(ddy.shape) == shape_out + shape_in + shape_in,\
+        '%s != %s + %s + %s' %(list(ddy.shape), shape_out, shape_in, shape_in)
     ddh = np.zeros( ddy.shape )
-    for i in range( D ):
+
+    # Indices to cycle through
+    inds = [ np.arange(D, dtype=int) for D in shape_in ]
+    inds = np.meshgrid( *inds )
+    inds = np.stack([ i.flatten() for i in inds ]).T
+    # Numerical gradients using finite differences
+    for j, i1 in enumerate(inds):
+        expr1 = ['%d'%i for i in i1]
         # Add steps to test points
-        Ti      = np.zeros( X.shape )
-        Ti[:,i] = eps
+        Ti = np.zeros( X.shape )
+        exec("Ti[" + ','.join(expr1) + "] = eps")
+        # Evaluate function
         yp = f(X + Ti)[0]
         ym = f(X - Ti)[0]
-        ddh[...,i,i] = (yp - 2*y + ym) / eps**2
+        # Finite difference computation
+        lexpr = ':,' * len(shape_out) + ','.join(expr1) + ',' + ','.join(expr1)
+        #st()
+        exec(r"ddh[" + lexpr + r"] = (yp - 2*y + ym) / eps**2")
 
-        for j in range(i+1, D):
-            # Add steps to test points
-            Tj      = np.zeros( X.shape )
-            Tj[:,j] = eps
+        for i2 in inds[j+1:]:
+            expr2 = ['%d'%i for i in i2]
+            # Step array
+            Tj = np.zeros( X.shape )
+            exec("Tj[" + ','.join(expr2) + "] = eps")
+            # Evaluate function
             ypp = f(X + Ti + Tj)[0]
             ypm = f(X + Ti - Tj)[0]
             ymp = f(X - Ti + Tj)[0]
             ymm = f(X - Ti - Tj)[0]
-            ddh[...,i,j] = (ypp - ypm - ymp + ymm) / (4 * eps**2)
-            ddh[...,j,i] = ddh[...,i,j]
+            # Finite difference computation
+            lexpr1 = ':,' * len(shape_out) + ','.join(expr1) + ',' + ','.join(expr2)
+            lexpr2 = ':,' * len(shape_out) + ','.join(expr2) + ',' + ','.join(expr1)
+            exec(r"ddh[" + lexpr1 + r"] = (ypp - ypm - ymp + ymm) / (4 * eps**2)")
+            exec(r"ddh[" + lexpr2 + r"] = ddh[" + lexpr1 + r"]")
 
     # Compute difference in gradients
     d = np.sqrt( (ddy-ddh)**2 / ((ddy+ddh)**2 + 1e-300) )
 
-    if flatten: 
-        return np.c_[d.flatten(), ddy.flatten(),ddh.flatten()]
-    return d,ddy,ddh
+    flattened = np.c_[d.flatten(), ddy.flatten(), ddh.flatten()]
+    return d, ddy, ddh, flattened
