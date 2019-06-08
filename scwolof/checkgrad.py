@@ -35,7 +35,8 @@ def gradient (f, X, eps=1e-6):
     shape_out = y.shape
     if not isinstance(shape_out, list):
         shape_out = list(shape_out)
-    assert list(dy.shape) == shape_out + shape_in
+    assert list(dy.shape) == shape_out + shape_in,\
+        '%s != %s + %s' %(list(dy.shape), shape_out, shape_in)
     dh = np.zeros( dy.shape )
 
     # Indices to cycle through
